@@ -1,0 +1,152 @@
+
+/////NFVISLA4H_DCGW01 (NFVISLA4H_RN06_DCGW01)/////
+/////Allow VLAN 
+#
+vlan batch 1026
+#
+interface Eth-Trunk115
+ port trunk allow-pass vlan 1026
+#
+/////Create VPN instance
+#
+ip vpn-instance VPN_N6_IPCBB_Galactic
+ description VPN_N6_IPCBB_Galactic
+ ipv4-family
+  route-distinguisher 10.226.85.42:100
+  apply-label per-instance
+  vpn-target 4201000606:10049 export-extcommunity evpn
+  vpn-target 4201000606:10049 import-extcommunity evpn
+  vxlan vni 10049
+#
+/////Configure WAN integrate with IPCBB
+#
+interface Vlanif1026
+ description IP_WAN_N6_IPCBB_Galactic_to_IPCBB_PE01
+ ip binding vpn-instance VPN_N6_IPCBB_Galactic
+ ip address 10.226.85.42 255.255.255.252
+#
+///Once you have reached this step You can test ping by following command.///
+ping -vpn VPN_N6_IPCBB_Galactic -a 10.226.85.42 10.226.85.41
+
+/////Create interface loopback at DCGW for BGP (to UPF)
+#
+interface LoopBack1161
+ description UPFSLA1H VPN_N6_IPCBB_Galactic
+ ip binding vpn-instance VPN_N6_IPCBB_Galactic
+ ip address 192.168.231.116 255.255.255.255
+#
+/////BGP to IPCBB
+#
+bgp 4201000606
+ipv4-family vpn-instance VPN_N6_IPCBB_Galactic
+ as-number 4200000409
+ router-id 10.226.85.42
+ network 0.0.0.0
+ network 192.168.231.116 255.255.255.255
+ import-route direct
+ import-route static
+ auto-frr
+ advertise l2vpn evpn import-route-multipath
+ peer 10.226.85.41 as-number 65004
+ peer 10.226.85.41 connect-interface Vlanif1026
+ peer 10.226.85.41 password cipher GalacticPlanB
+ peer 10.226.85.41 ip-prefix block_internal export
+ peer 192.168.230.116 as-number 4201000603
+ peer 192.168.230.116 description VPN_N6_IPCBB_Galactic to UPFSLA1H
+ peer 192.168.230.116 ebgp-max-hop 10
+ peer 192.168.230.116 connect-interface LoopBack1161	
+#
+/////### create EVPN instances and NVE interfaces ###
+evpn
+#
+evpn vpn-instance evpn2268 bd-mode
+ route-distinguisher 10.210.205.32:2268
+ vpn-target 4201000606:2268 export-extcommunity
+ vpn-target 4201000606:2268 import-extcommunity
+#
+interface nve1
+ vni 2268 head-end peer-list protocol bgp
+#
+bridge-domain 2268
+ vxlan vni 2268 split-horizon-mode
+ evpn binding vpn-instance evpn2268
+#
+interface Vbdif2268
+ mtu 4000
+ ip binding vpn-instance VPN_N6_IPCBB_Galactic
+ ip address 192.168.7.97 255.255.255.248
+ arp generate-rd-table enable
+ arp broadcast-detect enable
+ vxlan anycast-gateway enable
+ arp collect host enable
+#
+interface Eth-Trunk3.2268 mode l2
+ encapsulation dot1q vid 2268
+ rewrite pop single
+ bridge-domain 2268
+#
+interface Eth-Trunk4.2268 mode l2
+ encapsulation dot1q vid 2268
+ rewrite pop single
+ bridge-domain 2268
+#
+interface Eth-Trunk71.2268 mode l2
+ encapsulation dot1q vid 2268
+ rewrite pop single
+ bridge-domain 2268
+#
+/////BFD to UPF
+#
+bfd N6_IPCBB_Galactic_UPFSLA1H_01 bind peer-ip 192.168.7.98 vpn-instance VPN_N6_IPCBB_Galactic interface Vbdif2268 one-arm-echo destination-ip 192.168.231.116
+ discriminator local 11601
+ detect-multiplier 4
+ wtr 3
+ min-echo-rx-interval 500
+#
+/////Static Route to UPF (Tag BFD)
+#
+ip route-static vpn-instance VPN_N6_IPCBB_Galactic 192.168.230.116 255.255.255.255 192.168.7.98 track bfd-session N6_IPCBB_Galactic_UPFSLA1H_01 description Loopback VPN_N6_IPCBB_Galactic of UPFSLA1H
+# 
+commit
+save 
+
+==== Command to Check eBGP state to IPCBB (Shall be Established) =====
+display bgp vpnv4 vpn-instance VPN_N6_IPCBB_Galactic peer
+
+
+///////Roll back////////////
+///NFVISLA4H_DCGW01///
+#
+undo ip route-static vpn-instance VPN_N6_IPCBB_Galactic 192.168.230.116 255.255.255.255 192.168.7.98
+undo bfd N6_IPCBB_Galactic_UPFSLA1H_01
+#
+bgp 4201000606
+undo ipv4-family vpn-instance VPN_N6_IPCBB_Galactic
+#
+undo interface Eth-Trunk3.2268
+undo interface Eth-Trunk4.2268
+undo interface Eth-Trunk71.2268
+#
+undo interface Vlanif1026
+undo interface LoopBack1161
+undo interface Vbdif2268
+#
+interface nve1
+undo  vni 2268
+#
+undo bridge-domain 2268
+#
+undo evpn vpn-instance evpn2268 bd-mode
+#
+interface Eth-Trunk115
+undo  port trunk allow-pass vlan 1026
+#
+undo ip vpn-instance VPN_N6_IPCBB_Galactic
+#
+undo vlan batch 1026
+
+commit
+return
+save
+
+# 

@@ -1,0 +1,75 @@
+///////////NFVITL22H_RN04&RN05_EOR01 (Stack)///////////////
+create batch vlan
+#
+vlan batch 1028 1029
+#
+Bind VLAN to Eth-trunk(Existing)
+#
+interface Eth-trunk39
+port trunk allow-pass vlan 1028
+#
+interface Eth-trunk40
+port trunk allow-pass vlan 1029
+#
+create vpn instance
+#
+ip vpn-instance VPN_N6_IPCBB_Galactic
+ ipv4-family
+  route-distinguisher 10.226.85.50:100
+#
+create interface Vlanif for WAN to AIS IPCBB
+#
+interface Vlanif1028
+ description EOR_To_IPCBB_VPN_N6_IPCBB_Galactic
+ ip binding vpn-instance VPN_N6_IPCBB_Galactic
+ ip address 10.226.85.50 255.255.255.252
+#
+interface Vlanif1029
+ description EOR_To_IPCBB_VPN_N6_IPCBB_Galactic
+ ip binding vpn-instance VPN_N6_IPCBB_Galactic
+ ip address 10.226.85.54 255.255.255.252
+#
+Peer eBGP between DCGW <-> AIS IPCBB
+#
+bgp 65504
+ipv4-family vpn-instance VPN_N6_IPCBB_Galactic
+ router-id 10.226.85.50
+ import-route ospf 40530 route-policy SGi_BGP_import
+ maximum load-balancing ebgp 2
+ peer 10.226.85.49 as-number 65004
+ peer 10.226.85.49 connect-interface Vlanif1028
+ peer 10.226.85.49 local-as 4200000409
+ peer 10.226.85.49 password cipher GalacticPlanB
+ peer 10.226.85.53 as-number 65004
+ peer 10.226.85.53 connect-interface Vlanif1029
+ peer 10.226.85.53 local-as 4200000409
+ peer 10.226.85.53 password cipher GalacticPlanB
+
+#
+
+create ospf between (DCGW<->UPF)
+#
+ospf 40530 router-id 192.168.231.173 vpn-instance VPN_N6_IPCBB_Galactic
+ description UPFTL21H_VPN_N6_IPCBB_Galactic
+ default-route-advertise
+ bfd all-interfaces enable
+ bfd all-interfaces min-tx-interval 500 min-rx-interval 500 detect-multiplier 4
+ import-route static
+ import-route bgp
+ vpn-instance-capability simple
+ area 0.0.0.10
+#
+
+create interface Vlanif for ospf, ospf-bfd
+#
+interface Vlanif2218
+ description UPFTL21H_VPN_N6_IPCBB_Galactic
+ ip binding vpn-instance VPN_N6_IPCBB_Galactic
+ ip address 192.168.8.33 255.255.255.248
+ ospf bfd enable
+ ospf bfd min-tx-interval 500 min-rx-interval 500 detect-multiplier 4
+ ospf enable 40530 area 0.0.0.10
+#
+
+commit
+save

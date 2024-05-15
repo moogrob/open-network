@@ -1,0 +1,75 @@
+///////////NFVITL22H_RN04&RN05_EOR01 (Stack)///////////////
+create batch vlan
+#
+vlan batch 1026 1027
+#
+Bind VLAN to Eth-trunk(Existing)
+#
+interface Eth-trunk39
+port trunk allow-pass vlan 1026
+#
+interface Eth-trunk40
+port trunk allow-pass vlan 1027
+#
+create vpn instance
+#
+ip vpn-instance VPN_N6_IPCBB_Dodaydream
+ ipv4-family
+  route-distinguisher 10.226.133.234:100
+#
+create interface Vlanif for WAN to AIS IPCBB
+#
+interface Vlanif1026
+ description EOR_To_IPCBB_VPN_N6_IPCBB_Dodaydream
+ ip binding vpn-instance VPN_N6_IPCBB_Dodaydream
+ ip address 10.226.133.234 255.255.255.252
+#
+interface Vlanif1027
+ description EOR_To_IPCBB_VPN_N6_IPCBB_Dodaydream
+ ip binding vpn-instance VPN_N6_IPCBB_Dodaydream
+ ip address 10.226.133.238 255.255.255.252
+#
+Peer eBGP between DCGW <-> AIS IPCBB
+#
+bgp 65504
+ipv4-family vpn-instance VPN_N6_IPCBB_Dodaydream
+ router-id 10.226.133.234
+ import-route ospf 40529 route-policy SGi_BGP_import
+ maximum load-balancing ebgp 2
+ peer 10.226.133.233 as-number 65004
+ peer 10.226.133.233 connect-interface Vlanif1026
+ peer 10.226.133.233 local-as 4200000348
+ peer 10.226.133.233 password cipher Dodaydream
+ peer 10.226.133.237 as-number 65004
+ peer 10.226.133.237 connect-interface Vlanif1027
+ peer 10.226.133.237 local-as 4200000348
+ peer 10.226.133.237 password cipher Dodaydream
+
+#
+
+create ospf between (DCGW<->UPF)
+#
+ospf 40529 router-id 192.168.231.172 vpn-instance VPN_N6_IPCBB_Dodaydream
+ description UPFTL21H_VPN_N6_IPCBB_Dodaydream
+ default-route-advertise
+ bfd all-interfaces enable
+ bfd all-interfaces min-tx-interval 500 min-rx-interval 500 detect-multiplier 4
+ import-route static
+ import-route bgp
+ vpn-instance-capability simple
+ area 0.0.0.10
+#
+
+create interface Vlanif for ospf, ospf-bfd
+#
+interface Vlanif2217
+ description UPFTL21H_VPN_N6_IPCBB_Dodaydream
+ ip binding vpn-instance VPN_N6_IPCBB_Dodaydream
+ ip address 192.168.8.25 255.255.255.248
+ ospf bfd enable
+ ospf bfd min-tx-interval 500 min-rx-interval 500 detect-multiplier 4
+ ospf enable 40529 area 0.0.0.10
+#
+
+commit
+save

@@ -1,0 +1,107 @@
+
+/////NFVISLA4H_DCGW02/////
+/////Allow VLAN 
+#
+vlan batch 1025
+#
+interface Eth-Trunk116
+ port trunk allow-pass vlan 1025
+#
+/////Create VPN instance
+#
+ip vpn-instance VPN_N6_IPCBB_Dodaydream
+ description VPN_N6_IPCBB_Dodaydream
+ ipv4-family
+  route-distinguisher 10.226.133.230:100
+  apply-label per-instance
+  vpn-target 4201000606:10048 export-extcommunity evpn
+  vpn-target 4201000606:10048 import-extcommunity evpn
+ vxlan vni 10048
+#
+/////Configure WAN integrate with IPCBB
+#
+interface Vlanif1025
+ description IP_WAN_N6_IPCBB_Dodaydream_to_IPCBB_PE02
+ ip binding vpn-instance VPN_N6_IPCBB_Dodaydream
+ ip address 10.226.133.230 255.255.255.252
+#
+/////Create interface loopback at DCGW for BGP (to UPF)
+#
+interface LoopBack1152
+ description UPFSLA1H VPN_N6_IPCBB_Dodaydream
+ ip binding vpn-instance VPN_N6_IPCBB_Dodaydream
+ ip address 192.168.232.115 255.255.255.255
+#
+/////BGP to IPCBB
+#
+bgp 4201000606
+ipv4-family vpn-instance VPN_N6_IPCBB_Dodaydream
+ as-number 4200000348
+ router-id 10.226.133.230
+ network 0.0.0.0
+ network 192.168.232.115 255.255.255.255
+ import-route direct
+ import-route static
+ auto-frr
+ advertise l2vpn evpn import-route-multipath
+ peer 10.226.133.229 as-number 65004
+ peer 10.226.133.229 connect-interface Vlanif1025
+ peer 10.226.133.229 password cipher Dodaydream
+ peer 10.226.133.229 ip-prefix block_internal export
+ peer 192.168.230.115 as-number 4201000603
+ peer 192.168.230.115 description VPN_N6_IPCBB_Dodaydream to UPFSLA1H
+ peer 192.168.230.115 ebgp-max-hop 10
+ peer 192.168.230.115 connect-interface LoopBack1152
+#
+/////### create EVPN instances and NVE interfaces ###
+#
+evpn vpn-instance evpn2267 bd-mode
+ route-distinguisher 10.210.205.33:2267
+ vpn-target 4201000606:2267 export-extcommunity
+ vpn-target 4201000606:2267 import-extcommunity
+#
+interface nve1
+ vni 2265 head-end peer-list protocol bgp
+#
+bridge-domain 2267
+ vxlan vni 2267 split-horizon-mode
+ evpn binding vpn-instance evpn2267
+#
+interface Vbdif2267
+ mtu 4000
+ ip binding vpn-instance VPN_N6_IPCBB_Dodaydream
+ ip address 192.168.7.89 255.255.255.248
+ arp generate-rd-table enable
+ arp broadcast-detect enable
+ vxlan anycast-gateway enable
+ arp collect host enable
+#
+interface Eth-Trunk3.2267 mode l2
+ encapsulation dot1q vid 2267
+ rewrite pop single
+ bridge-domain 2267
+#
+interface Eth-Trunk4.2267 mode l2
+ encapsulation dot1q vid 2267
+ rewrite pop single
+ bridge-domain 2267
+#
+interface Eth-Trunk72.2267 mode l2
+ encapsulation dot1q vid 2267
+ rewrite pop single
+ bridge-domain 2267
+#
+/////BFD to UPF
+#
+bfd N6_IPCBB_VPN_N6_IPCBB_Dodaydream_UPFSLA1H_02 bind peer-ip 192.168.7.90 vpn-instance VPN_N6_IPCBB_Dodaydream interface Vbdif2267 one-arm-echo destination-ip 192.168.232.115
+ discriminator local 8006
+ detect-multiplier 4
+ wtr 3
+ min-echo-rx-interval 500
+#
+/////Static Route to UPF (Tag BFD)
+#
+ip route-static vpn-instance VPN_N6_IPCBB_Dodaydream 192.168.230.115 255.255.255.255 192.168.7.90 track bfd-session N6_IPCBB_VPN_N6_IPCBB_Dodaydream_UPFSLA1H_02 description Loopback VPN_N6_IPCBB_Dodaydream of UPFSLA1H
+#
+
+                

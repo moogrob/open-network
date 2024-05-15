@@ -1,0 +1,107 @@
+
+/////NFVISLA4H_DCGW02/////
+/////Allow VLAN 
+#
+vlan batch 1027
+#
+interface Eth-Trunk116
+ port trunk allow-pass vlan 1027
+#
+/////Create VPN instance
+#
+ip vpn-instance VPN_N6_IPCBB_Galactic
+ description VPN_N6_IPCBB_Galactic
+ ipv4-family
+  route-distinguisher 10.226.85.46:100
+  apply-label per-instance
+  vpn-target 4201000606:10049 export-extcommunity evpn
+  vpn-target 4201000606:10049 import-extcommunity evpn
+ vxlan vni 10049
+#
+/////Configure WAN integrate with IPCBB
+#
+interface Vlanif1027
+ description IP_WAN_N6_IPCBB_Galactic_to_IPCBB_PE02
+ ip binding vpn-instance VPN_N6_IPCBB_Galactic
+ ip address 10.226.85.46 255.255.255.252
+#
+/////Create interface loopback at DCGW for BGP (to UPF)
+#
+interface LoopBack1162
+ description UPFSLA1H VPN_N6_IPCBB_Galactic
+ ip binding vpn-instance VPN_N6_IPCBB_Galactic
+ ip address 192.168.232.116 255.255.255.255
+#
+/////BGP to IPCBB
+#
+bgp 4201000606
+ipv4-family vpn-instance VPN_N6_IPCBB_Galactic
+ as-number 4200000409
+ router-id 10.226.85.46
+ network 0.0.0.0
+ network 192.168.232.116 255.255.255.255
+ import-route direct
+ import-route static
+ auto-frr
+ advertise l2vpn evpn import-route-multipath
+ peer 10.226.85.45 as-number 65004
+ peer 10.226.85.45 connect-interface Vlanif1027
+ peer 10.226.85.45 password cipher GalacticPlanB
+ peer 10.226.85.45 ip-prefix block_internal export
+ peer 192.168.230.116 as-number 4201000603
+ peer 192.168.230.116 description VPN_N6_IPCBB_Galactic to UPFSLA1H
+ peer 192.168.230.116 ebgp-max-hop 10
+ peer 192.168.230.116 connect-interface LoopBack1162
+#
+/////### create EVPN instances and NVE interfaces ###
+#
+evpn vpn-instance evpn2269 bd-mode
+ route-distinguisher 10.210.205.33:2269
+ vpn-target 4201000606:2269 export-extcommunity
+ vpn-target 4201000606:2269 import-extcommunity
+#
+interface nve1
+ vni 2269 head-end peer-list protocol bgp
+#
+bridge-domain 2269
+ vxlan vni 2269 split-horizon-mode
+ evpn binding vpn-instance evpn2269
+#
+interface Vbdif2269
+ mtu 4000
+ ip binding vpn-instance VPN_N6_IPCBB_Galactic
+ ip address 192.168.7.105 255.255.255.248
+ arp generate-rd-table enable
+ arp broadcast-detect enable
+ vxlan anycast-gateway enable
+ arp collect host enable
+#
+interface Eth-Trunk3.2269 mode l2
+ encapsulation dot1q vid 2269
+ rewrite pop single
+ bridge-domain 2269
+#
+interface Eth-Trunk4.2269 mode l2
+ encapsulation dot1q vid 2269
+ rewrite pop single
+ bridge-domain 2269
+#
+interface Eth-Trunk72.2269 mode l2
+ encapsulation dot1q vid 2269
+ rewrite pop single
+ bridge-domain 2269
+#
+/////BFD to UPF
+#
+bfd N6_IPCBB_Galactic_UPFSLA1H_02 bind peer-ip 192.168.7.106 vpn-instance VPN_N6_IPCBB_Galactic interface Vbdif2269 one-arm-echo destination-ip 192.168.232.116
+ discriminator local 11606
+ detect-multiplier 4
+ wtr 3
+ min-echo-rx-interval 500
+#
+/////Static Route to UPF (Tag BFD)
+#
+ip route-static vpn-instance VPN_N6_IPCBB_Galactic 192.168.230.116 255.255.255.255 192.168.7.106 track bfd-session N6_IPCBB_Galactic_UPFSLA1H_02 description Loopback VPN_N6_IPCBB_Galactic of UPFSLA1H
+#
+
+                
