@@ -1,0 +1,1 @@
+web: streamlit run OPEN_NETWORK.py
