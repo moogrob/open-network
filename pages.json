@@ -1,0 +1,20 @@
+{
+    "22928974324a0f088e50dc53c994d14b": {
+        "page_script_hash": "22928974324a0f088e50dc53c994d14b",
+        "page_name": "OPEN_NETWORK",
+        "icon": "",
+        "script_path": "/Users/ken/Documents/openNetwork/open-network/OPEN_NETWORK.py"
+    },
+    "40541cf9352a2af567145dba07ecdbe6": {
+        "page_script_hash": "40541cf9352a2af567145dba07ecdbe6",
+        "page_name": "Generate_WAN_Script",
+        "icon": "\u25fb",
+        "script_path": "/Users/ken/Documents/openNetwork/open-network/pages/1_\u25fbGenerate_WAN_Script.py"
+    },
+    "83b9d70396e07afc1eeaa0acc47e6f39": {
+        "page_script_hash": "83b9d70396e07afc1eeaa0acc47e6f39",
+        "page_name": "Generate_DNN_Script",
+        "icon": "\u25fb",
+        "script_path": "/Users/ken/Documents/openNetwork/open-network/pages/2_\u25fbGenerate_DNN_Script.py"
+    }
+}
